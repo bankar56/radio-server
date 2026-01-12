@@ -1,7 +1,17 @@
+const http = require("http");
 const WebSocket = require("ws");
+
 const PORT = process.env.PORT || 3000;
 
-const wss = new WebSocket.Server({ port: PORT });
+// HTTP сервер (Render требует именно это)
+const server = http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end("WebRTC signaling server");
+});
+
+// WebSocket поверх HTTP
+const wss = new WebSocket.Server({ server });
+
 const rooms = {};
 
 wss.on("connection", ws => {
@@ -10,27 +20,23 @@ wss.on("connection", ws => {
   ws.on("message", raw => {
     let data;
     try {
-      data = JSON.parse(raw.toString()); // ✅ ВОТ ЭТО КЛЮЧ
-    } catch (e) {
-      console.error("JSON error", e);
+      data = JSON.parse(raw.toString());
+    } catch {
       return;
     }
 
-    // join комнаты
     if (data.join) {
       room = data.join;
       rooms[room] = rooms[room] || [];
       rooms[room].push(ws);
-
-      console.log("JOIN room:", room, "clients:", rooms[room].length);
+      console.log("JOIN", room, rooms[room].length);
       return;
     }
 
-    // ретрансляция сообщений ТОЛЬКО внутри комнаты
     if (room && rooms[room]) {
-      rooms[room].forEach(client => {
-        if (client !== ws && client.readyState === WebSocket.OPEN) {
-          client.send(JSON.stringify(data));
+      rooms[room].forEach(c => {
+        if (c !== ws && c.readyState === WebSocket.OPEN) {
+          c.send(JSON.stringify(data));
         }
       });
     }
@@ -44,4 +50,6 @@ wss.on("connection", ws => {
   });
 });
 
-console.log("✅ Signaling server READY on", PORT);
+server.listen(PORT, () => {
+  console.log("✅ HTTP + WSS signaling server on", PORT);
+});
