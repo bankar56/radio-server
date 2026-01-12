@@ -5,30 +5,43 @@ const wss = new WebSocket.Server({ port: PORT });
 const rooms = {};
 
 wss.on("connection", ws => {
-  ws.on("message", msg => {
-    const data = JSON.parse(msg);
+  let room = null;
 
-    if (data.join) {
-      ws.room = data.join;
-      rooms[ws.room] = rooms[ws.room] || [];
-      rooms[ws.room].push(ws);
+  ws.on("message", raw => {
+    let data;
+    try {
+      data = JSON.parse(raw.toString()); // ✅ ВОТ ЭТО КЛЮЧ
+    } catch (e) {
+      console.error("JSON error", e);
       return;
     }
 
-    if (ws.room && rooms[ws.room]) {
-      rooms[ws.room].forEach(c => {
-        if (c !== ws && c.readyState === WebSocket.OPEN) {
-          c.send(JSON.stringify(data));
+    // join комнаты
+    if (data.join) {
+      room = data.join;
+      rooms[room] = rooms[room] || [];
+      rooms[room].push(ws);
+
+      console.log("JOIN room:", room, "clients:", rooms[room].length);
+      return;
+    }
+
+    // ретрансляция сообщений ТОЛЬКО внутри комнаты
+    if (room && rooms[room]) {
+      rooms[room].forEach(client => {
+        if (client !== ws && client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify(data));
         }
       });
     }
   });
 
   ws.on("close", () => {
-    if (ws.room && rooms[ws.room]) {
-      rooms[ws.room] = rooms[ws.room].filter(c => c !== ws);
+    if (room && rooms[room]) {
+      rooms[room] = rooms[room].filter(c => c !== ws);
+      if (rooms[room].length === 0) delete rooms[room];
     }
   });
 });
 
-console.log("Signaling server ready");
+console.log("✅ Signaling server READY on", PORT);
