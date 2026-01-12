@@ -2,44 +2,33 @@ const WebSocket = require("ws");
 const PORT = process.env.PORT || 3000;
 
 const wss = new WebSocket.Server({ port: PORT });
-const rooms = {}; // { roomId: [ws, ws] }
+const rooms = {};
 
 wss.on("connection", ws => {
-  let roomId = null;
-
   ws.on("message", msg => {
     const data = JSON.parse(msg);
 
-    // вход в комнату
     if (data.join) {
-      roomId = data.join;
-      rooms[roomId] = rooms[roomId] || [];
-      rooms[roomId].push(ws);
-
-      if (rooms[roomId].length === 1) {
-        ws.send(JSON.stringify({ role: "caller" }));
-      } else {
-        ws.send(JSON.stringify({ role: "listener" }));
-      }
+      ws.room = data.join;
+      rooms[ws.room] = rooms[ws.room] || [];
+      rooms[ws.room].push(ws);
       return;
     }
 
-    // пересылка signaling ТОЛЬКО В СВОЕЙ КОМНАТЕ
-    if (roomId && rooms[roomId]) {
-      rooms[roomId].forEach(c => {
+    if (ws.room && rooms[ws.room]) {
+      rooms[ws.room].forEach(c => {
         if (c !== ws && c.readyState === WebSocket.OPEN) {
-          c.send(msg);
+          c.send(JSON.stringify(data));
         }
       });
     }
   });
 
   ws.on("close", () => {
-    if (roomId && rooms[roomId]) {
-      rooms[roomId] = rooms[roomId].filter(c => c !== ws);
-      if (rooms[roomId].length === 0) delete rooms[roomId];
+    if (ws.room && rooms[ws.room]) {
+      rooms[ws.room] = rooms[ws.room].filter(c => c !== ws);
     }
   });
 });
 
-console.log("Signaling server with rooms on", PORT);
+console.log("Signaling server ready");
