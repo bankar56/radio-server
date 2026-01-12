@@ -1,29 +1,23 @@
 const WebSocket = require("ws");
-
 const PORT = process.env.PORT || 3000;
-const wss = new WebSocket.Server({ port: PORT });
 
-let clients = [];
+const wss = new WebSocket.Server({ port: PORT });
+let peers = [];
 
 wss.on("connection", ws => {
-  clients.push(ws);
-
-  // первый — initiator
-  if (clients.length === 1) {
-    ws.send(JSON.stringify({ role: "initiator" }));
-  }
+  peers.push(ws);
 
   ws.on("message", msg => {
-    clients.forEach(c => {
-      if (c !== ws && c.readyState === WebSocket.OPEN) {
-        c.send(msg);
+    peers.forEach(p => {
+      if (p !== ws && p.readyState === WebSocket.OPEN) {
+        p.send(msg);
       }
     });
   });
 
   ws.on("close", () => {
-    clients = clients.filter(c => c !== ws);
+    peers = peers.filter(p => p !== ws);
   });
 });
 
-console.log("WebRTC signaling server on", PORT);
+console.log("Signaling server ready on", PORT);
