@@ -5,7 +5,7 @@ const wss = new WebSocket.Server({ port: PORT });
 
 wss.on("connection", ws => {
   ws.on("message", msg => {
-    // просто рассылаем всем кроме отправителя
+    // просто ретранслируем signaling
     wss.clients.forEach(client => {
       if (client !== ws && client.readyState === WebSocket.OPEN) {
         client.send(msg);
